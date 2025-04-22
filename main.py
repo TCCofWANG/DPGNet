@@ -10,12 +10,12 @@ import torch
 from exp_.exp import EXP
 
 #————————————————————————————————————————————————————————————————————————————————————————————————————————————
-# #########################################！！！注意事项！！！#################################################
-# 分布式训练指的是在不同的机子上跑，非分布式训练指的是在一个机子上跑。（一个机子多卡不算分布式训练）
-# 需要注意的点，新建一个Tensor的时候，如果在init时候创建的时候，要使用nn.Parameter()来，这样子Tensor才会被放到正确的cuda上
-# 即使的同一个模型，但是是不同的数据集，对应的输出路径也要不同，否则新的代码跑(train函数内)的时候会把对当前路径下的所有的文件全部删除
-# 数据输入模型前如果没有batch维度，那么就将其类型转为numpy，否则默认会将第一维度对半分（两个卡）
-# 在build model的时候送入的adj，此时的adj就已经是归一化后的拉普拉斯矩阵
+# #########################################!!! Attention !!! #################################################
+# Distributed training means running on different machines, non-distributed training means running on one machine. (Multiple cards on one machine does not count as distributed training)
+# Note that when you create a new Tensor, if you create it at init time, you should use nn.Parameter() so that the Tensor will be put on the correct cuda.
+# Even if the same model, but different dataset, the corresponding output path should be different, otherwise the new code will delete all files under the current path when running (within the train function).
+# If there is no batch dimension before inputting the data into the model, then convert its type to numpy, otherwise the first dimension will be split in half (two cards) by default.
+# In the build model when the input adj, at this time the adj is already normalized Laplace matrix
 #—————————————————————————————————————————————————————————————————————————————————————————————————————————————
 
 device=torch.device('cuda'if torch.cuda.is_available() else 'cpu')
@@ -28,24 +28,20 @@ def str2bool(v):
     if v == 'False':
         return False
 
-'''其他参数在config文件内'''
+'''The other parameters are in the config file.'''
 def add_config(parser):
-    # exp_name选择：
-    # deep_learning_interval-->'DGCN','ASTGCN','MSTGCN','HA'
-    # deep_learning-->剩下的模型+
 
-    parser.add_argument('--exp_name', default='deep_learning', choices=['deep_learning'], help='模型选用哪一个exp文件')
-    parser.add_argument('--train', default=True,type=str2bool,choices=[True,False], help='是否进行训练')
-    parser.add_argument('--resume', default=False, type=str2bool, choices=[True, False], help='是否读取预训练权重')
-    parser.add_argument('--output_dir',type=str,default=None,help='为None会自根据现有的输出文件自动+1，如果指定就会覆盖现有的输出文件')
-    parser.add_argument('--resume_dir', type=str,default=None,help='读取checkpoint的位置')
+    parser.add_argument('--exp_name', default='deep_learning', choices=['deep_learning'])
+    parser.add_argument('--train', default=True,type=str2bool,choices=[True,False], help='train or not')
+    parser.add_argument('--resume', default=False, type=str2bool, choices=[True, False], help='Load pre-trained model or not')
+    parser.add_argument('--output_dir',type=str,default='./experiments/exp30/',help='None will automatically +1 from the existing output file, if specified it will overwrite the existing output file.')
+    parser.add_argument('--resume_dir', type=str,default='./experiments/exp30/',help='Retrieve the location of the checkpoint')
 
-    parser.add_argument('--dp_mode', type=str2bool, default=False,help='是否在多卡上跑')
+    parser.add_argument('--dp_mode', type=str2bool, default=False,help='Does it run on multiple cards')
     parser.add_argument('--lr', type=float, default=0.0005)
     parser.add_argument('--batch_size', type=int, default=32)
     # model settings
-    parser.add_argument('--model', type=str, default='gpt2', help='Specify the PLM to use')
-    parser.add_argument('--model_name', type=str, default='STIDGCN_dynamic_patch_graph',help=['gwnet','gwnet_official',
+    parser.add_argument('--model_name', type=str, default='DPG_Mixer',help=['gwnet','gwnet_official',
                                                                             'DPG_Net','DPG_Mixer''DPG_Mixer_V2','DPG_Mixer_V3','DPG_Mixer_gwt'
                                                                             'PGCN','PMC_GCN','STIDGCN','TESTAM','WAVGCRN','STD_PLM', 'STIDGCN_dynamic_patch_graph'])
 
@@ -59,45 +55,40 @@ def add_config(parser):
     parser.add_argument('--seq_len', type=int, default=168)
     parser.add_argument('--pred_len', type=int, default=3)
 
-    # 与模型参数有关的设定
-    parser.add_argument('--num_features',help='输入模型的特征维度(会自动根据数据集指定)')
-    parser.add_argument('--time_features',help='输入模型的时间步特征（会自动根据数据集指定）')
-    parser.add_argument('--num_nodes', help='输入模型节点个数(会自动根据数据集指定)')
-    parser.add_argument('--d_model',type=int,default=32,help='隐藏层维度1')
-    parser.add_argument('--d_ff',type=int,default=64, help='隐藏层维度2')
-    parser.add_argument('--num_gcn', type=int, default=10, help='GCN的个数')
-    parser.add_argument('--patch_len', type=int, default=6, help='patch_len的长度')
-    parser.add_argument('--stride', type=int, default=1, help='stride的长度')
-
-    # 这是exp_interval中的模型的输入数据，输入数据有不同的周期性，窗口大小一般等于预测长度
-    parser.add_argument('--num_of_weeks', type=int, default=2,help='表示一次取多少个week周期窗口')
-    parser.add_argument('--num_of_days', type=int, default=1,help='表示一次取多少个day周期窗口')
-    parser.add_argument('--num_of_hours', type=int, default=2,help='表示一次取多少个hour周期窗口(近期)')
-    parser.add_argument('--points_per_hour', type=int, default=12,help='一个小时内有多少个数据采样点(与数据集有关)')
+    # Settings related to model parameters
+    parser.add_argument('--num_features',help="Input model's feature dimensions(will be automatically specified based on the dataset)")
+    parser.add_argument('--time_features',help='Time step features of the input model (will be specified automatically based on the dataset)')
+    parser.add_argument('--num_nodes', help='Input the number of model nodes (will be specified automatically based on the dataset)')
+    parser.add_argument('--d_model',type=int,default=32,help='Hidden layer dimension 1')
+    parser.add_argument('--d_ff',type=int,default=64, help='Hidden layer dimension 2')
+    parser.add_argument('--num_gcn', type=int, default=10, help='Number of GCNs')
+    parser.add_argument('--patch_len', type=int, default=6, help='length of patch_len')
+    parser.add_argument('--stride', type=int, default=1, help='length of stride')
+    parser.add_argument('--points_per_hour', type=int, default=12, help='How many data sampling points in an hour (related to the dataset)')
 
     # TimeMixer
-    parser.add_argument('--down_sampling_window', type=int, default=2, help='下采样一次，输出序列是原本序列的1/2长度')
-    parser.add_argument('--down_sampling_layers', type=int, default=1, help='包括自身')
+    parser.add_argument('--down_sampling_window', type=int, default=2, help='Down-sample by a factor of 2; the output sequence length is half of the original')
+    parser.add_argument('--down_sampling_layers', type=int, default=1, help='Number of down-sampling layers, including the original layer')
 
     # N_PatchTST
-    parser.add_argument('--patch_node_num', type=int, default=65, help='取决于数据集')
-    parser.add_argument('--patch_node_stride', type=int, default=65, help='取决于数据集，理论上来说窗口不重叠')
-    parser.add_argument('--info', type=str, default='None', help='实验信息')
+    parser.add_argument('--patch_node_num', type=int, default=65, help='Number of nodes per patch, depending on the dataset')
+    parser.add_argument('--patch_node_stride', type=int, default=65, help='Stride between patches, depending on the dataset; patches do not overlap')
+    parser.add_argument('--info', type=str, default='None', help='Experimental information')
     return parser
 
 def preprocess_args(args):
-    args.pin_memory = False # Dataloader中读数据加速的方式
+    args.pin_memory = False # The way read data is accelerated in Dataloader
     return args
 
 if __name__ == '__main__':
-    args = tu.config.get_args(add_config) # 获得设定的超参数
+    args = tu.config.get_args(add_config) # Getting set hyperparameters
     args = preprocess_args(args)
-    set_seed(args.seed) # 设置随机数种子
+    set_seed(args.seed) # Set random seed
 
     print(f"|{'=' * 101}|")
-    # 使用__dict__方法获取参数字典，之后遍历字典
+    # Use the __dict__ method to get a dictionary of arguments and traverse the dictionary afterwards
     for key, value in args.__dict__.items():
-        # 因为参数不一定都是str，需要将所有的数据转成str
+        # Because the arguments may not all be str, it is necessary to convert all the data to str
         print(f"|{str(key):>50s}|{str(value):<50s}|")
     print(f"|{'=' * 101}|")
     print(device)
@@ -109,4 +100,4 @@ if __name__ == '__main__':
             exp.test()
     
     else:
-        raise print('没有名字为{0}的exp文件'.format(args.exp_name))
+        raise print('No exp file with name {0}'.format(args.exp_name))
