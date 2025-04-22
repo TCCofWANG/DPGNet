@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 from data.data_process import load_data,get_time_features,load_TS_data,get_TS_time_features
 import numpy as np
 import torch
@@ -209,7 +209,6 @@ def build_dataloader(args, test=False):
         train_dataloader.max, val_dataloader.max, test_dataloader.max = max, max, max
     return adj, train_dataloader, val_dataloader, test_dataloader, train_sampler, val_sampler, test_sampler
 
-=======
 from data.data_process import load_data,get_time_features,load_TS_data,get_TS_time_features
 import numpy as np
 import torch
@@ -420,4 +419,3 @@ def build_dataloader(args, test=False):
         train_dataloader.max, val_dataloader.max, test_dataloader.max = max, max, max
     return adj, train_dataloader, val_dataloader, test_dataloader, train_sampler, val_sampler, test_sampler
 
->>>>>>> a8753cb6a51c7c14f0f324c158aaf1b887433e4b

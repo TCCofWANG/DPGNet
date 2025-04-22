@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import numpy as np
 import torch
 from torch.utils.data import Dataset,DataLoader
@@ -152,7 +152,7 @@ class SubwayDataset4LLM(Dataset):
 
 
 
-=======
+
 import numpy as np
 import torch
 from torch.utils.data import Dataset,DataLoader
@@ -306,4 +306,4 @@ class SubwayDataset4LLM(Dataset):
 
 
 
->>>>>>> a8753cb6a51c7c14f0f324c158aaf1b887433e4b
+

@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import pandas as pd
 import numpy as np
 import os
@@ -456,7 +456,7 @@ def read_and_generate_dataset(dataset,
         }
     }
 
-=======
+
 import pandas as pd
 import numpy as np
 import os
@@ -913,6 +913,4 @@ def read_and_generate_dataset(dataset,
             'target':target_stats
         }
     }
-
->>>>>>> a8753cb6a51c7c14f0f324c158aaf1b887433e4b
     return all_data
