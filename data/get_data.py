@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader,TensorDataset
 import pandas as pd
 from sklearn.preprocessing import StandardScaler,MinMaxScaler
 from torch.utils import data
-from data.dataset import split_dataset,SubwayDataset,TSDataset,SubwayDataset4LLM
+from data.dataset import split_dataset,SubwayDataset,TSDataset
 
 '''Split dataset and create dataloader for TS dataset'''
 def build_TS_dataloader(args, test=False):

@@ -11,5 +11,4 @@ from model.PMC_GCN import *
 from model.STIDGCN import STIDGCN
 from model.TESTAM import *
 from model.WAVGCRN import *
-from model.STD_PLM import *
 from model.STIDGCN_dynamic import *

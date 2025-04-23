@@ -32,16 +32,16 @@ def str2bool(v):
 def add_config(parser):
 
     parser.add_argument('--exp_name', default='deep_learning', choices=['deep_learning'])
-    parser.add_argument('--train', default=True,type=str2bool,choices=[True,False], help='train or not')
-    parser.add_argument('--resume', default=False, type=str2bool, choices=[True, False], help='Load pre-trained model or not')
-    parser.add_argument('--output_dir',type=str,default='./experiments/exp30/',help='None will automatically +1 from the existing output file, if specified it will overwrite the existing output file.')
-    parser.add_argument('--resume_dir', type=str,default='./experiments/exp30/',help='Retrieve the location of the checkpoint')
+    parser.add_argument('--train', default=False,type=str2bool,choices=[True,False], help='train or not')
+    parser.add_argument('--resume', default=True, type=str2bool, choices=[True, False], help='Load pre-trained model or not')
+    parser.add_argument('--output_dir',type=str,default='exp20/',help='None will automatically +1 from the existing output file, if specified it will overwrite the existing output file.')
+    parser.add_argument('--resume_dir', type=str,default='exp20/',help='Retrieve the location of the checkpoint')
 
     parser.add_argument('--dp_mode', type=str2bool, default=False,help='Does it run on multiple cards')
     parser.add_argument('--lr', type=float, default=0.0005)
     parser.add_argument('--batch_size', type=int, default=32)
     # model settings
-    parser.add_argument('--model_name', type=str, default='DPG_Mixer',help=['gwnet','gwnet_official',
+    parser.add_argument('--model_name', type=str, default='PMC_GCN',help=['gwnet','gwnet_official',
                                                                             'DPG_Net','DPG_Mixer''DPG_Mixer_V2','DPG_Mixer_V3','DPG_Mixer_gwt'
                                                                             'PGCN','PMC_GCN','STIDGCN','TESTAM','WAVGCRN','STD_PLM', 'STIDGCN_dynamic_patch_graph'])
 

@@ -1,0 +1,2 @@
+dataset,model,time,LR,batch_size,seed,MAE,MSE,RMSE,MAPE,seq_len,pred_len,d_model,d_ff,test_cost_time,info,output_dir
+weather,PMC_GCN,20250423-114124,0.0005,32,21,0.06759,0.04428,0.21044,0.1098,168,3,32,64,71.158711,None,experiments/exp20

@@ -11,22 +11,8 @@ import numpy as np
 import test
 import yaml
 from datetime import datetime
-from layers.STD_PLM_related import *
-from layers.STD_PLM_related.STD_PLM_related_LLM import *
 
-# for PTD_PLM
-def getllm(args):
-    if args.model == 'phi2':
-        basemodel = Phi2(args.causal, args.lora, args.ln_grad, args.llm_layers)
-    elif args.model == 'gpt2':
-        basemodel = GPT2(args.causal, args.lora, args.ln_grad, args.llm_layers)
-    elif args.model == 'llama3':
-        basemodel = LLAMA3(args.causal, args.lora, args.ln_grad, args.llm_layers)
-    elif args.model == 'transformer':
-        basemodel = Transformer(args.causal, args.lora, args.ln_grad, args.llm_layers)
-    else:
-        raise NotImplementedError
-    return basemodel
+
 
 device=torch.device('cuda'if torch.cuda.is_available() else 'cpu')
 
@@ -220,27 +206,7 @@ class EXP():
                                  out_dim=1, pred_len=args.pred_len, d_model=args.d_model,
                                  d_ff=args.d_ff,
                                  kernel_size=2, layers=args.layers, blocks=1, args=args)
-            
-        elif args.model_name == 'STD_PLM':
-            args.sample_len = args.seq_len 
-            args.output_len = args.pred_len
-            args.model = 'gpt2'
-            args.causal = True
-            args.lora = True
-            args.ln_grad = False
-            args.llm_layers = 3
-            args.input_dim = 1
-            args.output_dim = 1
-            args.node_emd_dim = 64
-            args.sag_dim = 128
-            args.sag_tokens = 128
-            args.t_dim = 64
-            args.trunc_k = 16
-            basemodel = getllm(args)
-            self.model = STALLM(basemodel=basemodel, sample_len=args.sample_len, output_len=args.output_len, input_dim=args.input_dim,
-                                output_dim=args.output_dim, node_emb_dim=args.node_emd_dim, sag_dim=args.sag_dim,
-                                sag_tokens=args.sag_tokens, adj_mx=adj, dis_mx=None, use_node_embedding=True,use_timetoken=True,
-                                use_sandglassAttn=True, dropout=0, trunc_k=args.trunc_k, t_dim=args.t_dim,wo_conloss=False, args=args)
+        
         else:
             raise NotImplementedError
 
