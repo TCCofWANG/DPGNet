@@ -21,17 +21,15 @@ Table3. Adaptive Graph Learner replacement experiments' results.
 
 
 # 📝Install dependecies
-
 Install the required packages with following code.
-
 ```pip install -r requirements.txt```
 
 # 📚Data Preparation
-
+![Tabel4](./image/dataset_intro.png)
+Tabel4. Statistics of datasets.
+To prepare the benchmark datasets, you can obtain the Los Angeles traffic speed files (METR-LA) and the Bay Area traffice flow data files(PEMS-BAY) from the [DCRNN repository](https://github.com/liyaguang/DCRNN), the Los Angeles traffic flow files(PEMS08) from the [STSGCN](https://github.com/Davidham3/STSGCN) and you can obtain the two Time-Series datasets from [FiLM](https://github.com/tianzhou2011/FiLM)
 
 
 # 🚀Run Experiment
-
 We have provided all the experimental scripts for the benchmarks in the `./scripts folder`, which cover all the benchmarking experiments. To reproduce the results, you can run the following shell code.
-
 ``` ./scripts/train.sh```
