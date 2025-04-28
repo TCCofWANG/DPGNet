@@ -4,7 +4,7 @@ A pytorch implementation for the paper 'DPGNet: A Dynamic Graph Prediction Netwo
 
 # 🎯Overview
 ![Figure1](./image/framework.jpg)
-Figure1.The overall architecture of the proposed STD2Vformer
+Figure1.The overall architecture of the proposed DPGNet
 
 # 📊Regular Prediction
 
