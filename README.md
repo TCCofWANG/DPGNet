@@ -3,7 +3,7 @@
 A pytorch implementation for the paper 'DPGNet: A Dynamic Graph Prediction Network for Spatiotemporal Forecasting'. 
 
 # 🎯Overview
-
+![Figure1](./image/framework.jpg)
 Figure1.The overall architecture of the proposed STD2Vformer
 
 # 📊Regular Prediction
