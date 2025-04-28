@@ -20,7 +20,7 @@ Figure1.The overall architecture of the proposed STD2Vformer
 
 # 📝Install dependecies
 
-Install the required packages
+Install the required packages with following code.
 
 ```pip install -r requirements.txt```
 
@@ -32,4 +32,4 @@ Install the required packages
 
 We have provided all the experimental scripts for the benchmarks in the `./scripts folder`, which cover all the benchmarking experiments. To reproduce the results, you can run the following shell code.
 
-```   ./scripts/train.sh```
+``` ./scripts/train.sh```
