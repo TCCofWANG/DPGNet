@@ -27,7 +27,8 @@ Install the required packages with following code.
 # 📚Data Preparation
 ![Tabel4](./image/dataset_intro.png)
 Tabel4. Statistics of datasets.
-To prepare the benchmark datasets, you can obtain the Los Angeles traffic speed files (METR-LA) and the Bay Area traffice flow data files(PEMS-BAY) from the [DCRNN repository](https://github.com/liyaguang/DCRNN), the Los Angeles traffic flow files(PEMS08) from the [STSGCN](https://github.com/Davidham3/STSGCN) and you can obtain the two Time-Series datasets from [FiLM](https://github.com/tianzhou2011/FiLM)
+
+To prepare the benchmark datasets, you can obtain the Los Angeles traffic speed files (METR-LA) and the Bay Area traffice flow data files(PEMS-BAY) from the [DCRNN repository](https://github.com/liyaguang/DCRNN), the Los Angeles traffic flow files(PEMS08) from the [STSGCN repository](https://github.com/Davidham3/STSGCN) and you can obtain the two Time-Series datasets from [FiLM repository](https://github.com/tianzhou2011/FiLM)
 
 
 # 🚀Run Experiment
