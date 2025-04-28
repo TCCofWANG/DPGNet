@@ -26,6 +26,7 @@ Adaptive Graph Learner replacement experiments' results.
 
 # 📝Install dependecies
 Install the required packages with following code.
+
 ```pip install -r requirements.txt```
 
 # 📚Data Preparation
@@ -38,4 +39,5 @@ To prepare the benchmark datasets, you can obtain the Los Angeles traffic speed 
 
 # 🚀Run Experiment
 We have provided all the experimental scripts for the benchmarks in the `./scripts folder`, which cover all the benchmarking experiments. To reproduce the results, you can run the following shell code.
+
 ``` ./scripts/train.sh```
