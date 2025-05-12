@@ -20,11 +20,11 @@ class EXP():
     def __init__(self,args):
         assert args.resume_dir==args.output_dir
         self.agrs=args
-        tu.dist.init_distributed_mode(args)  # 初始化分布式训练
-        # 早停机制
+        tu.dist.init_distributed_mode(args)  
+        
         if args.output_dir==None or args.output_dir=='None' or args.output_dir=='none':
             args.output_dir = None
-            tu.config.create_output_dir(args)  # 创建输出的目录
+            tu.config.create_output_dir(args) 
             args.resume_dir=args.output_dir
         else:
             args.output_dir = os.path.join('experiments',args.output_dir)
@@ -36,14 +36,11 @@ class EXP():
         self.output_path = output_path
         resume_path = os.path.join(args.resume_dir,args.model_name)
         if not os.path.exists(resume_path):
-            raise print('没有找到对应的读取预训练权重的路径')
+            raise print('The corresponding path for reading the pre-trained weights was not found.')
         resume_path = os.path.join(resume_path, args.data_name + '_best_model.pkl')
         self.resume_path = resume_path
 
-        # seed = tu.dist.get_rank() + args.seed  # 0+args.seed
-        # tu.model_tool.seed_everything(seed)  # 设置随机数种子，便于可重复实验
 
-        # train_sampler,test_sampler是分布式训练时使用的，未分布式训练时，其都为None
         if args.data_name in ['electricity','weather']:
             # get_data timeseries datasets
             (adj, self.train_dataloader, self.val_dataloader, self.test_dataloader,
@@ -56,25 +53,24 @@ class EXP():
 
 
 
-        self.adj=adj # TODO 这里的adj就是普通的adj
+        self.adj=adj # TODO The adj here is just an ordinary adj.
 
         # get_model
-        self.build_model(args, adj)  # 得到对应的模型
-        self.model.to(device)  # 送入对应的设备中
+        self.build_model(args, adj)  
+        self.model.to(device)  
 
-        self.model = tu.dist.ddp_model(self.model, [args.local_rank])  # 分布式训练模型，好像也没有发挥作用
+        self.model = tu.dist.ddp_model(self.model, [args.local_rank])  
         if args.dp_mode:
-            self.model = nn.DataParallel(self.model)  # 分布训练，单机子多显卡
+            self.model = nn.DataParallel(self.model)  
             print('using dp mode')
 
-        # 模型训练所需的
+
         criterion = nn.MSELoss()
         self.criterion=criterion
 
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=args.lr, weight_decay=args.weight_decay)  # 引入权重衰减的Adam
         self.optimizer=optimizer
 
-        # 权重衰减：cos衰减
         lr_optimizer = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.end_epoch,eta_min=args.lr / 1000)
         self.lr_optimizer=lr_optimizer
 
@@ -83,21 +79,21 @@ class EXP():
                                                           scheduler=self.lr_optimizer, patience=args.patience)
 
         if args.resume:
-            print('加载预训练模型')
+            print('Load the pre-trained model')
             try:
                 dp_mode = args.args.dp_mode
             except AttributeError as e:
                 dp_mode = True
-            # FIXME 自动读取超参数 这里还不完善
+            
             hparam_path = os.path.join(args.output_dir, 'hparam.yaml')
             with open(hparam_path, 'r') as f:
                 hparam_dict = yaml.load(f, yaml.FullLoader)
                 args.output_dir = hparam_dict['output_dir']
 
-            # 读取最好的权重
+            # load the best model
             self.load_best_model(path=self.resume_path,args=args, distributed=dp_mode)
 
-    '''建立模型'''
+    '''Build the model'''
     def build_model(self,args,adj):
 
         if args.model_name == 'gwnet_official':
@@ -120,7 +116,7 @@ class EXP():
 
         elif args.model_name == 'STIDGCN':
             args.n_hidden = 32
-            args.granularity = 24*args.points_per_hour # 一天多少个采样点，5min采样一次的话那就是288
+            args.granularity = 24*args.points_per_hour 
             self.model = STIDGCN(input_dim=args.num_features, num_nodes=args.num_nodes, channels=args.n_hidden, granularity=args.granularity,
                                  input_len=args.seq_len,output_len=args.pred_len,  points_per_hour=args.points_per_hour, dropout=0.1)
             
