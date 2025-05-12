@@ -41,7 +41,7 @@ def seed_worker(worker_id):
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
-'''以下是设置随机数种子'''
+'''The following is to set the random seed.'''
 def seed_everything(seed, benchmark=False):
     # os.environ['PYTHONHASHSEED'] = str(seed)
     # os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
