@@ -4,7 +4,6 @@ import torch.nn as nn
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# 源码是type == 'RNN'
 class GCRN(nn.Module):
     def __init__(self, dims, gdep, alpha, beta, gamma):
         super(GCRN, self).__init__()
@@ -49,16 +48,14 @@ class IDWTL(nn.Module):
     def __init__(self, num_nodes, hidden_size):
         super(IDWTL, self).__init__()
 
-        # 定义可学习参数，即一个形状为(207, 64)的矩阵
+        
         self.weight = nn.Parameter(torch.Tensor(num_nodes, hidden_size))
         self.gelu = nn.GELU()
 
-        # 初始化权重
+        # initialize the weight with a uniform distribution
         nn.init.uniform_(self.weight, a=15, b=30)
 
     def forward(self, x):
-        # x的shape为(B, N, Hidden_size)
-        # 对输入张量的每个切片与可学习矩阵进行Hadamard乘积
         x = x * self.weight.unsqueeze(0)
         x = self.gelu(x)
 

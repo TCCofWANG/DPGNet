@@ -13,11 +13,11 @@ class Generate_SE():
         self.walk_length = 80
         self.dimensions = 64
         self.window_size = 10
-        self.iter = 1000 # 最大循环次数
+        self.iter = 1000 # Maximum number of iterations
         self.Adj_file = Adj_file
         self.SE_file = SE_file
         self.node_num=node_num
-        self.generate_SE() # 调用主函数生成对应的SE文件
+        self.generate_SE() # Call the main function to generate the corresponding SE file.
 
     def read_graph(self,adj_matrix_file):
         if adj_matrix_file.split('.')[-1] == 'csv':
@@ -25,7 +25,7 @@ class Generate_SE():
         elif adj_matrix_file.split('.')[-1] == 'pkl':
             adj = load_adjacency_matrix(adj_matrix_file, num_of_vertices=self.node_num)
         else:
-            raise print('邻接矩阵的路径错误。没有路径名称为{0}的路径'.format(adj_matrix_file))
+            raise print('Error in adjacency matrix path. No path named {0}'.format(adj_matrix_file))
         G = nx.from_numpy_array(adj)
         return G
 
@@ -37,12 +37,12 @@ class Generate_SE():
         model.wv.save_word2vec_format(output_file)
 
         return
-
-    '''主函数'''
+    
+    '''Main function'''
     def generate_SE(self):
         nx_G = self.read_graph(self.Adj_file)
         G = node2vec.Graph(nx_G, self.is_directed, self.p, self.q)
         G.preprocess_transition_probs()
-        walks = G.simulate_walks(self.num_walks, self.walk_length) #随机游走得到对共现情况
-        self.learn_embeddings(walks, self.dimensions, self.SE_file) # 根据共现情况进行Word2Vec的Embedding-->得到节点的Embedding
+        walks = G.simulate_walks(self.num_walks, self.walk_length) # Perform random walks to obtain co-occurrence information
+        self.learn_embeddings(walks, self.dimensions, self.SE_file) # Perform Word2Vec embedding based on co-occurrence information --> Obtain node embeddings
 

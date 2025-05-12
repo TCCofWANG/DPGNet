@@ -171,25 +171,25 @@ class TESTAM(nn.Module):
 
         input = input.permute(0, 2, 3, 1)  # B,N,L,C
 
-        # 以下过程是获取动态邻接矩阵，更好的学习静态图(应该是因为元学习的原因)
+        # The following process obtains a dynamic adjacency matrix to better learn the static graph 
         n1 = torch.matmul(self.gate_network.We1, self.gate_network.memory)
         n2 = torch.matmul(self.gate_network.We2, self.gate_network.memory)
         g1 = torch.softmax(torch.relu(torch.mm(n1, n2.T)), dim=-1)
         g2 = torch.softmax(torch.relu(torch.mm(n2, n1.T)), dim=-1)
         new_supports = [g1, g2]
 
-        hour = (seqs_time[:, -2:-1, ...] + 0.5) * 23  # 得到第几个小时
-        min = (seqs_time[:, -1:, ...] + 0.5) * 59  # 得到第几分钟
-        cur_time_index = ((hour * 60 + min) / (60 / self.points_per_hour)).squeeze(1).squeeze(1).type(torch.LongTensor)  # 得到第几个时间步
+        hour = (seqs_time[:, -2:-1, ...] + 0.5) * 23  # Get the hour index
+        min = (seqs_time[:, -1:, ...] + 0.5) * 59  # Get the minute index
+        cur_time_index = ((hour * 60 + min) / (60 / self.points_per_hour)).squeeze(1).squeeze(1).type(torch.LongTensor)   # Get the time step index
 
         next_time_index = cur_time_index+self.seq_len
         if True in (next_time_index > 287):
             next_time_index[next_time_index > 287] = next_time_index[next_time_index > 287] - 288
 
-        # 每个专家都能输出自己的输出和最后一层的隐状态
+        # Each expert outputs its own result and the hidden state of the last layer
         o_identity, h_identity = self.identity_expert(cur_time_index, input)
 
-        _, h_future = self.identity_expert(next_time_index)  # 伪标签的获取
+        _, h_future = self.identity_expert(next_time_index) # Obtain pseudo-labels
 
         o_adaptive, h_adaptive = self.adaptive_expert(input, h_future, new_supports)
 
@@ -198,7 +198,7 @@ class TESTAM(nn.Module):
         B, N, T, _ = o_identity.size()
         gate_in = [h_identity, h_adaptive, h_attention]
 
-        # 打分
+        # Scoring
         gate = torch.softmax(self.gate_network(input, gate_in), dim=-1)
         out = torch.zeros_like(o_identity).view(-1, 1)
 
@@ -209,7 +209,7 @@ class TESTAM(nn.Module):
         route_prob_max = route_prob_max.view(-1)
         routes = routes.view(-1)
 
-        # 选最好的
+        # Select the best
         for i in range(len(outs)):
             cur_out = outs[i].view(-1, 1)
             indices = torch.eq(routes, i).nonzero(as_tuple=True)[0]
@@ -224,9 +224,10 @@ class TESTAM(nn.Module):
         return out
 
 
-# 每个专家为了提高专业性，大体架构相同但是细节不同
 
-# 从架构来说，时间信息建模专家没有用伪标签嵌入、空间建模层和时间增强注意力层
+# Each expert has the same general structure but different details to improve professionalism.
+# In terms of architecture, the time information modeling expert did not use pseudo-label embedding, spatial modeling layers
+# and temporal enhanced attention layers.
 class TemporalModel(nn.Module):
     """
     Input shape
@@ -247,9 +248,9 @@ class TemporalModel(nn.Module):
         self.in_dim = in_dim
         self.act = activation
         self.embedding = TemporalInformationEmbedding(hidden_size, vocab_size=vocab_size)
-        self.linear1 = nn.Parameter(torch.randn(in_dim, hidden_size))  # 将输入升维
-        self.linear2 = nn.Parameter(torch.randn(hidden_size * 2, hidden_size))  # 对输入和时间嵌入进行降维
-        self.linear3 = nn.Parameter(torch.randn(hidden_size, 1))  # 将结果降维
+        self.linear1 = nn.Parameter(torch.randn(in_dim, hidden_size))  
+        self.linear2 = nn.Parameter(torch.randn(hidden_size * 2, hidden_size))  
+        self.linear3 = nn.Parameter(torch.randn(hidden_size, 1)) 
 
         self.node_features = nn.Parameter(torch.randn(num_nodes, hidden_size))
 
@@ -262,7 +263,7 @@ class TemporalModel(nn.Module):
 
         TIM = self.embedding(seq_time)
 
-        # 主要目的是与输入维度匹配+元学习(因为实验是在一个数据集上与多个模型做对比实验，所以没发挥元学习的作用)
+        
         x_nemb = torch.einsum('blc, nc -> bnlc', TIM, self.node_features)
         if x is None:
             x = torch.zeros_like(x_nemb[...,:self.in_dim])
@@ -285,7 +286,7 @@ class TemporalModel(nn.Module):
 
         return out, attns[-1]
 
-# 从架构来说，时空建模专家没有用输入序列时间嵌入, 空间建模层用的是GCN方法
+
 class STModel(nn.Module):
     """
 
@@ -320,7 +321,7 @@ class STModel(nn.Module):
         for i, (temporal_layer, spatial_layer, ed_layer, ff) in enumerate(
                 zip(self.temporal_layers, self.spatial_layers, self.ed_layers, self.ff)):
 
-            #  与论文和源码的原参相同，先时间注意力再空间建模
+            
             if self.TS:
                 skip = x.contiguous()
                 x1 = self.norm[i](skip+temporal_layer(x))  # B, N, L, C
@@ -342,7 +343,7 @@ class STModel(nn.Module):
         out = self.proj(self.act(x))
         return out, hiddens[-1]
 
-# 从架构来说，注意力专家没有用输入序列时间嵌入, 空间建模层用的是注意力方法
+
 class AttentionModel(nn.Module):
 
     def __init__(self, hidden_size, layers, dropout, edproj=False, in_dim=2, out_dim=1, TS=True,
@@ -403,10 +404,10 @@ class MemoryGate(nn.Module):
     def __init__(self, hidden_size, num_nodes, mem_hid=32, input_dim=3, output_dim=1, memory_size=20,
                  sim=nn.CosineSimilarity(dim=-1), nodewise=False, ind_proj=True, attention_type='attention'):
         super(MemoryGate, self).__init__()
-        self.sim = sim  # 用余弦相似度
+        self.sim = sim  
         self.nodewise = nodewise
 
-        self.memory = nn.Parameter(torch.randn(memory_size, mem_hid))  # 元学习方法的memory_node_bank
+        self.memory = nn.Parameter(torch.randn(memory_size, mem_hid))  
 
         self.hid_query =[nn.Parameter(torch.randn(hidden_size, mem_hid),requires_grad=True) for _ in range(3)]
         self.key = [nn.Parameter(torch.randn(hidden_size, mem_hid),requires_grad=True) for _ in range(3)]
@@ -423,7 +424,7 @@ class MemoryGate(nn.Module):
         #     else:
         #         nn.init.zeros_(p)
 
-    def forward(self, input, hidden):  # 计算input_query与各个专家的输出的余弦相似度
+    def forward(self, input, hidden):  
         attention = self.attention
         B, N, T, _ = input.size()
         memories = self.query_mem(input)
@@ -441,7 +442,7 @@ class MemoryGate(nn.Module):
         key = torch.matmul(x, self.key[i].to(x.device))
         value = torch.matmul(x, self.value[i].to(x.device))
 
-        # 更细粒度的计算，让专家更专业，粗粒度不符合论文思想(粗粒度在源码仅表示为对时间维度求和)
+        
         energy = torch.matmul(query, key.transpose(-1, -2))
         score = torch.softmax(energy, dim=-1)
         out = torch.matmul(score, value)

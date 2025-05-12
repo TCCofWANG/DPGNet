@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-# TODO 得到的是局部分量
+# TODO Gets the low-frequency component
 class SNorm(nn.Module):
     def __init__(self,  channels):
         super(SNorm, self).__init__()
@@ -17,7 +17,7 @@ class SNorm(nn.Module):
         return out #(B,C,N,T)
 
 
-# TODO 得到的是高频分量
+# TODO Gets the high-frequency component
 class TNorm(nn.Module):
     def __init__(self,  num_nodes, channels, track_running_stats=True, momentum=0.1):
         super(TNorm, self).__init__()
@@ -30,12 +30,16 @@ class TNorm(nn.Module):
 
     def forward(self, x):
         # input:x(B,C,N,T)
-        if self.track_running_stats:#在batch_size维度和时间维度
+        if self.track_running_stats:
             mean = x.mean((0, 3), keepdims=True)
             var = x.var((0, 3), keepdims=True, unbiased=False)
             if self.training:
                 n = x.shape[3] * x.shape[0]
-                # 以下的是指数加权平均求期望E，因为这个是整一个完整(数据集)的时间步上的均值和方差,因此这里采用指数加权平均的方法来近似得到
+                '''
+                The following is the exponentially weighted average to calculate the expected value E,
+                because this is the mean and variance over an entire complete time step of the dataset, 
+                so the method of exponential weighting is used here to approximate this.
+                '''
                 with torch.no_grad():
                     self.running_mean = self.momentum * mean + (1 - self.momentum) * self.running_mean
                     self.running_var = self.momentum * var * n / (n - 1) + (1 - self.momentum) * self.running_var

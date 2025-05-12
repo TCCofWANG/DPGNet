@@ -29,7 +29,7 @@ class GraphConvNet(nn.Module):
 
         h = torch.cat(out, dim=1)
         h = self.final_conv(h)
-        h = F.dropout(h, self.dropout, training=self.training) #与另一份代码相比多出来的 测试过加上效果会差很多
+        h = F.dropout(h, self.dropout, training=self.training) 
         return h
 
 
@@ -69,11 +69,10 @@ class GWNet_official(nn.Module):
         if do_graph_conv and addaptadj:
             if aptinit is None:
                 nodevecs = torch.randn(num_nodes, apt_size), torch.randn(apt_size, num_nodes)
-                # self.adaptive_mx =nn.Parameter(torch.zeros(num_nodes, num_nodes), requires_grad=True)
+            
             else:
                 nodevecs = self.svd_init(apt_size, aptinit)
             self.supports_len += 1
-            # 测试过这样效果比直接生成邻接矩阵的效果差
             self.nodevec1, self.nodevec2 = [Parameter(n.to(device), requires_grad=True) for n in nodevecs]
 
         depth = list(range(blocks * layers))
@@ -94,9 +93,9 @@ class GWNet_official(nn.Module):
                 # dilated convolutions，TCN-a,TCN-b
                 self.filter_convs.append(Conv2d(residual_channels, dilation_channels, (1, kernel_size), dilation=D))
                 self.gate_convs.append(Conv2d(residual_channels, dilation_channels, (1, kernel_size), dilation=D))
-                D *= 2 # 膨胀系数d以2的指数形式增长
+                D *= 2 
                 receptive_field += additional_scope
-                additional_scope *= 2 #由于kernel=2，因此其实每一次加上膨胀系数d即可
+                additional_scope *= 2 
         self.receptive_field = receptive_field
 
         self.end_conv = nn.Sequential(nn.Conv2d(skip_channels, end_channels, (1, 1), bias=True),
@@ -121,8 +120,8 @@ class GWNet_official(nn.Module):
             x1 = self.start_conv(f1)
             x2 = F.leaky_relu(self.cat_feature_conv(f2))
             x = x1 + x2
-        else: # 进入的是这部分的代码
-            x = self.start_conv(x) # 特征维度升维
+        else: 
+            x = self.start_conv(x) 
         skip = 0
         adjacency_matrices = self.fixed_supports
         # calculate the current adaptive adj matrix once per iteration
@@ -143,7 +142,7 @@ class GWNet_official(nn.Module):
             #                                          |
             # ---------------------------------------> + ------------->	*skip*
             residual = x
-            # dilated convolution -->输入序列的长度会不断变小
+
             filter = torch.tanh(self.filter_convs[i](residual))
             gate = torch.sigmoid(self.gate_convs[i](residual))
             x = filter * gate

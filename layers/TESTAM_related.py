@@ -37,7 +37,7 @@ class DCN(nn.Module):
         h = F.dropout(h, self.dropout, training=self.training)
         return h
 
-# 多头注意力
+# Multi-Head Attention
 class Attention(nn.Module):
     """
     Assume input has shape B, N, T, C or B, T, N, C
@@ -109,7 +109,6 @@ class TemporalInformationEmbedding(nn.Module):
         emb = self.embedding(seq_len.to(device))
         weight = torch.einsum('blc,cd->bld', (emb, self.linear.to(emb.device)))
 
-        # 这里是建模周期性的，n_freq表示论文中的条件分界点，但是源码与论文的条件是反过来的，这里依照论文的条件
         if self.n_freq == 0:
             return weight
         if self.n_freq == emb.size(-1):

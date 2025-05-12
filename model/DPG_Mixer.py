@@ -8,7 +8,7 @@ import math
 import matplotlib.pyplot as plt
 import os
 import seaborn as sns
-from model.DPG_Mixer_base import DPG_Mixer_Predictor
+from layers.DPG_Mixer_base import DPG_Mixer_Predictor
 
 device=torch.device('cuda'if torch.cuda.is_available() else 'cpu')
 

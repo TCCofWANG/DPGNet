@@ -26,6 +26,7 @@ class FITS(nn.Module):
 
         self.length_ratio = 1.5
 
+        # Linear layers for frequency upsampling of the real and imaginary parts
         self.freq_upsampler_real = nn.Linear(self.dominance_freq,
                                              int(self.dominance_freq * self.length_ratio))  # complex layer for frequency upcampling]
         self.freq_upsampler_imag = nn.Linear(self.dominance_freq,
@@ -36,8 +37,10 @@ class FITS(nn.Module):
         B,N,L,D = input_x.shape
 
         x = input_x.reshape(-1,L,D) #[B*N,L,D]
-        low_specx = torch.fft.rfft(x, n = self.fft_len,dim=1)  #最终变换长度是n//2 + 1 因为实数傅里叶变换的对称性，所以只记录一半
-        low_specx = torch.view_as_real(low_specx[:, 0:self.dominance_freq, :])   # 复数值 按 real值存储变成2维向量
+        low_specx = torch.fft.rfft(x, n = self.fft_len,dim=1)  
+        # Compute real FFT along the time dimension, output length is n//2 + 1 due to symmetry of real FFT
+        low_specx = torch.view_as_real(low_specx[:, 0:self.dominance_freq, :])  
+        # Keep only the dominant frequencies and view complex values as real-imag pairs
         low_specx_real = low_specx[:, :, :, 0]
         low_specx_imag = low_specx[:, :, :, 1]
 
@@ -46,14 +49,15 @@ class FITS(nn.Module):
         low_specxy_real = real - imag
         low_specxy_imag = real + imag
 
+        # Pad real and imaginary components back to the full FFT length
         low_specxy_R = torch.zeros(
             [low_specxy_real.size(0), self.fft_len//2 + 1, low_specxy_real.size(2)],
-            dtype=low_specxy_real.dtype).to(low_specxy_real.device)  # 填充至特定长度
+            dtype=low_specxy_real.dtype).to(low_specxy_real.device)  
         low_specxy_R[:, 0:low_specxy_real.size(1), :] = low_specxy_real
 
         low_specxy_I = torch.zeros(
             [low_specxy_imag.size(0), self.fft_len//2 + 1, low_specxy_imag.size(2)],
-            dtype=low_specxy_imag.dtype).to(low_specxy_imag.device)  # 填充至特定长度
+            dtype=low_specxy_imag.dtype).to(low_specxy_imag.device)  
         low_specxy_I[:, 0:low_specxy_imag.size(1), :] = low_specxy_imag
 
         low_specxy = torch.complex(low_specxy_R, low_specxy_I)
@@ -98,8 +102,11 @@ class FITS_simple(nn.Module):
         return x
 
 
-# 强制输出季节模式的季节处理模块
+
 class Nbeats_simple(nn.Module):
+    """
+    Simplified N-BEATS block that enforces a seasonal component output
+    """
     def __init__(self, seq_len, output_len, d_model):
         super(Nbeats_simple, self).__init__()
 
@@ -111,27 +118,28 @@ class Nbeats_simple(nn.Module):
         p = thetas.size()[-1]
         assert p <= thetas.shape[2], 'thetas_dim is too big.'
         p1, p2 = (p // 2, p // 2) if p % 2 == 0 else (p // 2, p // 2 + 1)
+        # Construct cosine and sine basis functions for seasonality
         s1 = torch.tensor(np.array([np.cos(2 * np.pi * i * t) for i in range(p1)])).float()  # H/2-1
         s2 = torch.tensor(np.array([np.sin(2 * np.pi * i * t) for i in range(p2)])).float()
         S = torch.cat([s1, s2])
-        #seasonality_output = torch.zeros(thetas.shape[0],thetas.shape[1],S.shape[-1]).to(device)
+        # Compute seasonality output via tensor contraction
         seasonality_output = torch.einsum("bdn, nl->bdl", thetas, S.to(device))
 
 
         return seasonality_output
 
     def forward(self, x):
-        # 先换维度，在融合 [B,N,L,D]->[B,N,D,L]=>[B*N,D,L]
+        # Reshape from [B, N, L, D] to [B*N, D, L] for processing
         B,N,L,D = x.shape
         x = x.permute(0,1,3,2).reshape(B*N,D,L)
         theta = self.theta_b_fc(x)
         s = self.seasonality_model(theta,self.backcast_linspace,x.device)
 
         _,D,o = s.shape
-        # 展开 [B*N,D,L]=>[B,N,D,L]
+        # s shape: [B*N, D, output_len]
         output = s.reshape(B,N,D,o)
 
-        # [B,N,ouput-len,D]
+        # Return tensor with shape [B, N, output_len, D]
         return output.permute(0,1,3,2)
 
 
@@ -207,19 +215,19 @@ class series_decomp_FFT(nn.Module):
 
 class TemporalConvNet(nn.Module):
     """
-    Temporal Convolutional Network (TCN) 类
+    Temporal Convolutional Network (TCN) class
     """
 
     def __init__(self, input_size, output_size, num_layers, kernel_size=2, dropout=0.2):
         """
-        初始化函数
+        Constructor
 
-        参数:
-        input_size (int): 输入特征维度
-        output_size (int): 输出特征维度
-        num_channels (list): TCN 中每个卷积层的输出通道数
-        kernel_size (int): 卷积核大小
-        dropout (float): Dropout 比例
+        Parameters:
+        input_size (int): Dimensionality of input features
+        output_size (int): Dimensionality of output features
+        num_layers (int): Number of TCN layers
+        kernel_size (int): Size of convolutional kernel
+        dropout (float): Dropout rate
         """
         super(TemporalConvNet, self).__init__()
         layers = []
@@ -237,22 +245,22 @@ class TemporalConvNet(nn.Module):
 
     def forward(self, x):
         """
-        前向传播函数
+        Forward pass
 
-        参数:
-        x (torch.Tensor): 输入序列, 维度为 [B, N, L, D]
+        Parameters:
+        x (torch.Tensor): Input sequence of shape [B, N, L, D]
 
-        返回:
-        torch.Tensor: 输出序列, 维度为 [B, output_size, L]
+        Returns:
+        torch.Tensor: Output sequence of shape [B, output_size, L]
         """
-        # 将输入序列重塑为 [B*N, D, L]
+        # Reshape to [B*N, D, L]
         B,N,L,D = x.shape
         x = x.permute(0, 1, 3, 2).contiguous().view(-1, D, L)
 
-        # 通过 TCN 网络
+        # Pass through TCN layers
         x = self.network(x)
 
-        # 将输出序列重塑为 [B, output_size, L]
+        # Reshape back to [B, N, C, L]
         _, C, L = x.size()
         x = x.view(B,N, C, L)
 
@@ -261,7 +269,7 @@ class TemporalConvNet(nn.Module):
 
 class TemporalBlock(nn.Module):
     """
-    Temporal Block, 包含一个扩张卷积层和一个 ResNet 连接
+    Temporal Block, contains a dilated convolution layer and a ResNet-style skip connection
     """
 
     def __init__(self, n_inputs, n_outputs, kernel_size, stride, dilation, dropout=0.2):
@@ -290,9 +298,6 @@ class TemporalBlock(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, x):
-        """
-        前向传播函数
-        """
         res = x
         padding_layer = nn.ConstantPad1d((self.padding*2, 0), 0)
         padded_x = padding_layer(x)
@@ -305,7 +310,7 @@ class TemporalBlock(nn.Module):
 
 class Chomp1d(nn.Module):
     """
-    Chomp 模块, 用于去除卷积输出中不需要的填充部分
+    Chomp layer to remove the padding added by the convolutional layer
     """
 
     def __init__(self, chomp_size):
@@ -332,11 +337,12 @@ class Graph_Generator(nn.Module):
 
         adj_f = torch.cat([(adj_dyn_1).unsqueeze(-1)] + [(adj_dyn_2).unsqueeze(-1)], dim=-1)
         adj_f = self.fc(adj_f).squeeze()
-
+        
+        # Enforce sparsity by keeping top-80% strongest connections
         topk_values, topk_indices = torch.topk(adj_f, k=int(adj_f.shape[1] * 0.8), dim=-1)
         mask = torch.zeros_like(adj_f)
         mask.scatter_(-1, topk_indices, 1)
-        adj_f = adj_f * mask  # 确保稀疏性
+        adj_f = adj_f * mask  
         adj_f = torch.softmax(adj_f,dim=-1)
 
         return adj_f
@@ -350,12 +356,14 @@ class Adj_Generator(nn.Module):
         self.fc = nn.Linear(2, 1)
 
     def forward(self, x):
-        if len(x.shape)==3: # 趋势项
+        # Trend Item
+        if len(x.shape)==3: 
             # x[B,N,D]
             x = x.permute(0,2,1)
             adj_dyn_1 = torch.tanh((torch.einsum("bcn, cm->bnm", x, self.memory).contiguous()/ math.sqrt(x.shape[1])))
             adj_dyn_2 = torch.tanh((torch.einsum("bcn, bcm->bnm", x, x).contiguous()/ math.sqrt(x.shape[1])))
-        else: # 季节项
+        # Season Item
+        else:     
             # x[B,N,L,D]
             x = x.permute(0, 3, 1, 2)
             adj_dyn_1 = torch.tanh((torch.einsum("bcnl, cm->bnm", x, self.memory).contiguous() / math.sqrt(x.shape[1])))
@@ -363,23 +371,6 @@ class Adj_Generator(nn.Module):
 
         adj_f = torch.cat([(adj_dyn_1).unsqueeze(-1)] + [(adj_dyn_2).unsqueeze(-1)], dim=-1)
         adj_f = torch.sigmoid(self.fc(adj_f).squeeze(-1))
-
-        # topk_values, topk_indices = torch.topk(adj_f, k=int(adj_f.shape[1] * 0.3), dim=-1)
-        # mask = torch.zeros_like(adj_f)
-        # mask.scatter_(-1, topk_indices, 1)
-        # adj_f = adj_f * mask
-        # # 将 adj_f 中除了 topk 位置以外的值设置为负无穷
-        # #adj_f.masked_fill_(mask == 0, -99999)
-        # # 如果softmax结果还是很挫，考虑二值化
-        # #adj_f = torch.softmax(adj_f,dim=-1)
-        #
-        # # 使用布尔掩码来查找非零元素
-        # non_zero_elements = adj_f[adj_f != 0]
-
-        # 计算非零元素的均值
-        #quantile_item = torch.quantile(adj_f, 0.75)
-
-        #adj_f = torch.where(adj_f > quantile_item.item(), 1.0, 0.0)
 
         return adj_f
 
@@ -425,7 +416,7 @@ class MultiScaleSeasonMixing(nn.Module):
         out_season_list = [out_high.permute(0, 2, 1)]
 
         for i in range(len(season_list) - 1):
-            out_low_res = self.down_sampling_layers[i](out_high) #细的指导粗的
+            out_low_res = self.down_sampling_layers[i](out_high) 
             out_low = out_low + out_low_res
             out_high = out_low
             if i + 2 <= len(season_list) - 1:
@@ -555,10 +546,10 @@ class PastDecomposableMixing(nn.Module):
             trend = trend.reshape(-1,self.num_nodes,L,D)
 
             # trend process
-            trend_state = self.trend_process(trend)  #[B,N,D]去掉了时间维度
+            trend_state = self.trend_process(trend) 
 
             # season process
-            season_state = self.season_process[i](season) #[B,N,ouput-len,D] 保留了时间维度
+            season_state = self.season_process[i](season) 
 
             seasons.append(season_state)
 
@@ -710,7 +701,7 @@ class DPG_Mixer_Predictor(nn.Module):
         # adj = [adj_dynamic_with_explicit,adj_dynamic_with_implicit]
         test_vision = kargs.get('test_vision')
         b,D,n,L = x.shape
-        x = self.start_conv(x)  # 特征维度升维
+        x = self.start_conv(x)  
         adjacency_matrices=adj
 
         x_list = self._multi_scale_process_inputs(x)

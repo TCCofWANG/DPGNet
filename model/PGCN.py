@@ -144,7 +144,6 @@ class PGCN(nn.Module):
         # calculate the current adaptive adj matrix once per iteration
         new_supports = None
         if self.gcn_bool and self.addaptadj and self.supports is not None:
-            # 这里就是唯一和GWnet不同的地方
             xn = input[:, 0, :, -12:]
             xn = (xn - xn.min(dim=-1)[0].unsqueeze(-1)) / \
                  (xn.max(dim=-1)[0] - xn.min(dim=-1)[0]).unsqueeze(-1)
@@ -152,7 +151,8 @@ class PGCN(nn.Module):
             xn = xn / torch.sqrt((xn ** 2).sum(dim=-1)).unsqueeze(-1)
             adp = torch.einsum('nvt, tc->nvc', (xn, self.adpvec))
             adp = torch.bmm(adp, xn.permute(0, 2, 1))
-            adp = F.softmax(F.relu(adp), dim=1) # 相当于Attention，将Attention的打分矩阵作为对应的adj
+            adp = F.softmax(F.relu(adp), dim=1) 
+            # Equivalent to Attention, using the attention scoring matrix as the corresponding adj.
 
             new_supports = self.supports + [adp.cuda()]
 

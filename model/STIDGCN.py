@@ -43,7 +43,7 @@ class STIDGCN(nn.Module):
         # Data Embedding
         time_emb = self.Temb(seqs_time)  # output:(B,C,N,L)
         x = torch.cat([self.start_conv(x)] + [time_emb], dim=1)
-        # IDGCN_Tree
+        # IDGCN_Tree 
         x = self.tree(x)
         # Decoder
         gcn = self.glu(x) + x

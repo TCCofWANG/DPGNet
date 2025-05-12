@@ -70,7 +70,7 @@ class EarlyStopping:
             'optimizer': self.optimizer.state_dict(),
             'lr_scheduler': self.scheduler.state_dict(),
             'epoch': epoch}
-        filepath=os.path.split(self.path)[0] # 将文件夹和文件分开
+        filepath=os.path.split(self.path)[0] 
         if not os.path.exists(filepath):
             os.makedirs(filepath)
         torch.save(save_files, self.path)

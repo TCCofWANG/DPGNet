@@ -37,7 +37,7 @@ class WavGCRN(nn.Module):
 
         self.fc_final = nn.Linear(self.hidden_size, self.out_dim)
 
-        dims = [in_dim + self.hidden_size + 1, self.hidden_size]  # +1是因为融入时间步维度
+        dims = [in_dim + self.hidden_size + 1, self.hidden_size]  # +1 is because of the integration of the time step dimension.
 
         self.aggC,self.aggH,self.camH,self.camC = [feature_agg(self.hidden_size * 2, self.hidden_size) for i in range(4)]
         self.IDWT_L, self.IDWT_H = [IDWTL(num_nodes, self.hidden_size) for i in range(2)]
@@ -59,7 +59,7 @@ class WavGCRN(nn.Module):
 
     def cal_wavelet(self, input, level, cal_type):
         x = input  # b,c,n,l
-        wavelet = 'db1'  # 使用Daubechies 1小波
+        wavelet = 'db1'  # Use Daubechies Wavelet 1
 
         if cal_type == '1':
             coeffs = pywt.wavedec(x.cpu(), wavelet, level=level, axis=-1)
@@ -82,21 +82,18 @@ class WavGCRN(nn.Module):
             return [element.contiguous().squeeze(0) for element in output]  # b,c,n
 
     def interleave_tensors(self, A, B):
-        # A和B的shape都为(b, n, c)
+        # The shapes of A and B are both (b, n, c).
         batch_size, num_nodes, features = A.size()
 
-        # 将A和B展开为(b*n, c)
+        # Expand A and B into (b*n, c)
         A_flat = A.view(-1, features)
         B_flat = B.view(-1, features)
 
-        # 创建一个形状为(b*n, 2*c)的空白张量
         C = torch.zeros(batch_size * num_nodes, features * 2)
-
-        # 将A的值放入拼接后的偶数列，B的值放入拼接后的奇数列
+        
         C[:, ::2] = A_flat
         C[:, 1::2] = B_flat
 
-        # 将拼接后的张量重塑回原始形状(b, n, 2*c)
         C = C.view(batch_size, num_nodes, features * 2)
 
         return C
@@ -167,26 +164,26 @@ class WavGCRN(nn.Module):
         batch_size = x.size(0)
 
 
-        hour = (seqs_targets_time[:, -2:-1, ...] + 0.5) * 23  # 得到第几个小时
-        min = (seqs_targets_time[:, -1:, ...] + 0.5) * 59  # 得到第几分钟
+        hour = (seqs_targets_time[:, -2:-1, ...] + 0.5) * 23  
+        min = (seqs_targets_time[:, -1:, ...] + 0.5) * 59  
         hour_index = ((hour * 60 + min) / (60 / self.points_per_hour)).squeeze().type(torch.LongTensor)  # 得到第几个时间步
 
         T_ds = hour_index[:, ::self.level+1].unsqueeze(-1).unsqueeze(-1) \
-            .repeat(1, 1, self.num_nodes, 1).transpose(1, 3)    # 2 = level+1
+            .repeat(1, 1, self.num_nodes, 1).transpose(1, 3)    
         f = x
 
-        xD, xAD = self.cal_wavelet(f, self.level, '2')  # 小波变换
+        xD, xAD = self.cal_wavelet(f, self.level, '2')  
 
-        # 获取隐藏单元
+
         Hidden_State = []
         Cell_State = []
         Hidden_State_1, Cell_State_1 = self.initHidden(batch_size * self.num_nodes, self.hidden_size)
         Hidden_State_2, Cell_State_2 = self.initHidden(batch_size * self.num_nodes, self.hidden_size)
 
-        # Encoder部分
+        # Encoder part
         for i in range(xD.shape[-1]):  # self.seq_length
             x1 = xD[..., i]  # b,c,n
-            t = T_ds[..., i]  # b,c,n (此处c=1)
+            t = T_ds[..., i]  # b,c,n 
             x1 = torch.cat((x1, t), dim=1)
             Hidden_State_1, Cell_State_1 = self.step(x1, Hidden_State_1, Cell_State_1,
                                                      predefined_A, self.adj1, 'D', 'encoder')
@@ -195,7 +192,7 @@ class WavGCRN(nn.Module):
 
         for i in range(xAD.shape[-1]):  # self.seq_length
             x2 = xAD[..., i]  # b,c,n
-            t = T_ds[..., i]  # b,c,n (此处c=1)
+            t = T_ds[..., i]  # b,c,n 
             x2 = torch.cat((x2, t), dim=1)
             Hidden_State_2, Cell_State_2 = self.step(x2, Hidden_State_2, Cell_State_2,
                                                      predefined_A, self.adj2, 'AD', 'encoder')
@@ -205,7 +202,7 @@ class WavGCRN(nn.Module):
         Hidden_State = self.idwtl_layer(Hidden_State)
         Cell_State = self.idwtl_layer(Cell_State)
 
-        # 融合部分
+        # Fusion part
         if self.out_dim <= 6.0:
             Hidden_State = 0.3 * self.camH(Hidden_State) + 0.7 * self.aggH(Hidden_State_1, Hidden_State_2)
             Cell_State = 0.3 * self.camC(Cell_State) + 0.7 * self.aggC(Cell_State_1, Cell_State_2)
@@ -218,13 +215,13 @@ class WavGCRN(nn.Module):
 
         timeofday = ((seqs_targets_time[:, 2:3, ...] + 0.5) * (6 - 0)).squeeze().type(torch.LongTensor) \
             .unsqueeze(-1).unsqueeze(-1) \
-            .repeat(1, 1, self.num_nodes, 1).transpose(1, 3)   # 一周的第几天  # B,1,N,L
+            .repeat(1, 1, self.num_nodes, 1).transpose(1, 3)   
 
         decoder_input = go_symbol
 
         outputs_final = []
 
-        # Decoder部分
+        # Decoder part
         for i in range(self.output_dim):
             decoder_input = torch.cat([decoder_input.to(device), timeofday[..., i].to(device)], dim=1)
 
@@ -296,10 +293,6 @@ class WavGCRN(nn.Module):
             """Evaluate value and gradient of acyclicity constraint."""
             E = slin.expm(W * W)  # (Zheng et al. 2018)
             h = np.trace(W)
-            #     # A different formulation, slightly faster at the cost of numerical stability
-            #     M = np.eye(d) + W * W / d  # (Yu et al. 2019)
-            #     E = np.linalg.matrix_power(M, d - 1)
-            #     h = (E.T * M).sum() - d
             G_h = E.T * W * 2
             return h, G_h
 
@@ -328,22 +321,18 @@ class WavGCRN(nn.Module):
             while rho < rho_max:
                 sol = sopt.minimize(_func, w_est, method='L-BFGS-B', jac=True, bounds=bnds)
                 w_new = sol.x
-                # print("w_new: ", w_new.sum())
                 h_new, _ = _h(_adj(w_new))
                 if h_new > 0.25 * h:
                     rho *= 10
                 else:
                     break
-            # print("change: ", (w_new-w_est).sum())
             w_est, h = w_new, h_new
             alpha += rho * h
             if h <= h_tol or rho >= rho_max:
                 break
         W_est = _adj(w_est)
         print("learned graph: ", W_est.sum(), np.max(W_est))
-        # W_est[np.abs(W_est) < w_threshold] = 0
-        # print(W_est)
-        # print(W_est.sum())
+
         return torch.from_numpy(W_est).to(self.device)
 
     def graph_learning(self):
@@ -353,15 +342,6 @@ class WavGCRN(nn.Module):
             t1 = time.time()
             print("what about input1: ", (self.emb1 - np.mean(self.emb1)).sum())
             self.adj1 = self.notears_linear(X=self.emb1, lambda1=0.1, loss_type='l2').unsqueeze(0).repeat(self.batch_size, 1, 1).float()
-            # if self.adj1.sum() < 0.00001:
-            # print("repeat")
-            # b=self.notears_linear(X=embedding_feature1, lambda1=0.1, loss_type='l2').unsqueeze(0).repeat(self.batch_size, 1, 1)
-            # print("add uniform")
-            # embedding_feature1 += np.random.uniform(0.0, 1e-11, (64,207))
-            # a=self.notears_linear(X=embedding_feature1, lambda1=0.1, loss_type='l2').unsqueeze(0).repeat(self.batch_size, 1, 1).float()
-            # print("pure uniform")
-            # embedding_feature1 = np.random.uniform(0.0, 1e-11, (64,207))
-            # c=self.notears_linear(X=embedding_feature1, lambda1=0.1, loss_type='l2').unsqueeze(0).repeat(self.batch_size, 1, 1).float()
             t2 = time.time()
             print("first graph learning time cost: ", t2 - t1)
             print("what about input2: ", (self.emb2 - np.mean(self.emb2)).sum())
@@ -369,9 +349,7 @@ class WavGCRN(nn.Module):
             self.adj2 = self.notears_linear(X=self.emb2, lambda1=0.1, loss_type='l2').unsqueeze(0).repeat(self.batch_size,
                                                                                                                    1,
                                                                                                                    1).float()
-            # print("add uniform2")
-            # embedding_feature2 += np.random.uniform(0.0, 1e-11, (64,207))
-            # a=self.notears_linear(X=embedding_feature1, lambda1=0.1, loss_type='l2').unsqueeze(0).repeat(self.batch_size, 1, 1).float()
+
             t2 = time.time()
             print("second graph learning time cost: ", t2 - t1)
 

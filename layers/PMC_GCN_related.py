@@ -12,7 +12,7 @@ class Transformer(nn.Module):
         num_layers,
         heads,
         time_num,
-        forward_expansion, ##？
+        forward_expansion,
         cheb_K,
         device,
         dropout
@@ -41,7 +41,7 @@ class Transformer(nn.Module):
 
 ### Encoder
 class Encoder(nn.Module):
-    # 堆叠多层 ST-Transformer Block
+    # Stacked Multi-layer ST-Transformer Block
     def __init__(
         self,
         seq_len,
@@ -92,7 +92,7 @@ class STTransformerBlock(nn.Module):
     def __init__(self, seq_len,embed_size, heads, adj, time_num, cheb_K, dropout, device, forward_expansion):
         super(STTransformerBlock, self).__init__()
         # self.STransformer = STransformer(embed_size, heads, adj, cheb_K, dropout, device, forward_expansion)
-        # ES-GCN 模型替换STransformer模型
+        # Replace STransformer model with ES-GCN model
         self.ES_GCN = ES_GCN(embed_size, adj, dropout, device)
         self.TTransformer = TTransformer(embed_size, heads, time_num, dropout, device, forward_expansion)
         self.norm1 = nn.LayerNorm(embed_size)
@@ -105,13 +105,14 @@ class STTransformerBlock(nn.Module):
         # value,  key, query: [N, T, C] [B, N, T, C]
         # Add skip connection,run through normalization and finally dropout
 
-        # ES-GCN模型的输出，替代x1的值，只需要保证格式正确
+        # Output of ES-GCN model, replacing the value of x1, just need to ensure the format is correct
         x1 = self.norm1(self.ES_GCN(value, key, query) + query)
 
-        ## 添加代码（Teacher）
+        ## Added code (Teacher)
         B, N, T, C = x1.shape
         query1 = x1
-        x_rttf = torch.fft.rfft(query1, dim=2, norm='ortho') #dim=2是在时间维度上,'ortho'表示进行正交归一化，即将傅里叶变换结果除以有效长度的平方根
+        x_rttf = torch.fft.rfft(query1, dim=2, norm='ortho') 
+        #dim=2 is along the time dimension, 'ortho' means orthogonal normalization, i.e., dividing the Fourier transform result by the square root of the effective length
         weight = torch.view_as_complex(self.complex_weight)
         x_rttf = x_rttf * weight
         x_fft = torch.fft.irfft(x_rttf, n=T, dim=2, norm='ortho')
@@ -126,34 +127,31 @@ class ES_GCN(nn.Module):
         self.adj = adj
         self.device = device
         self.D_S = adj.to(self.device)
-        # 调用 EST-GCN中使用的GCN embed_size = input_dim; embed_size * 2 = hidden_dim; embed_size = output_dim
+        # Call GCN used in EST-GCN embed_size = input_dim; embed_size * 2 = hidden_dim; embed_size = output_dim
         self.gcn = GCN(adj, embed_size, embed_size, device)
-        # 邻接矩阵归一化（ESTGCN方式）
+        # Normalize adjacency matrix (ESTGCN way)
         self.register_buffer('laplacian', calculate_laplacian_with_self_loop(torch.FloatTensor(adj)))
-        # self.norm_adj = nn.InstanceNorm2d(1)    # 对邻接矩阵归一化
+        # self.norm_adj = nn.InstanceNorm2d(1)    # Normalize adjacency matrix
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, value, key, query):
         # value, key, query: [N, T, C]  [B, N, T, C]
-        # Spatial Embedding 部分
+        # Spatial Embedding part
         B, N, T, C = query.shape
         D_S = get_sinusoid_encoding_table(N, C).to(self.device)
-        D_S = D_S.expand(B, T, N, C)  # [B, T, N, C]相当于在第2维复制了T份, 第一维复制B份
+        D_S = D_S.expand(B, T, N, C)  # [B, T, N, C] equivalent to copying T times along the 2nd dimension, and B times along the 1st dimension
         D_S = D_S.permute(0, 2, 1, 3)  # [B, N, T, C]
-        # GCN 部分
+        # GCN part
         X_G = torch.Tensor(B, N, 0, C).to(self.device)
         adj_laplacian = self.laplacian
-        # 对邻接矩阵做归一化是因为邻接矩阵的构成不是0和1，而是两个传感器之间的距离，因此要做归一化
-        # self.adj = self.adj.unsqueeze(0).unsqueeze(0)
-        # self.adj = self.norm_adj(self.adj)
-        # self.adj = self.adj.squeeze(0).squeeze(0)
+        # Normalizing the adjacency matrix is necessary because the adjacency matrix is not composed of 0s and 1s, but rather the distances between two sensors, hence normalization is required
         for t in range(query.shape[2]):
             o = self.gcn(query[:, :, t, :], adj_laplacian)  # [B, N, C]
             o = o.unsqueeze(2)  # shape [N, 1, C] [B, N, 1, C]
             #             print(o.shape)
             X_G = torch.cat((X_G, o), dim=2)
-        # 最后X_G [B, N, T, C]
-        # 做一个dropout
+        # Final X_G [B, N, T, C]
+        # Apply dropout
         out = self.dropout(X_G)
         return out
 
@@ -166,13 +164,13 @@ class GCN_layer(nn.Module):
         self._output_dim = output_dim
         self.device = device
         self.weights = nn.Parameter(torch.FloatTensor(self._input_dim, self._output_dim))
-        # LH 增加可学习训练参数矩阵α
+        # LH Add learnable parameter matrix α
         self.alpha_matrix = nn.Parameter(torch.eye(adj.shape[0]), requires_grad=True)
         # LH
         self.reset_parameters()
 
     def reset_parameters(self):
-        # 这里需要注意一下alpha_matrix的参数值是否需要进行初始化
+        # Note whether the parameters of alpha_matrix need to be initialized here
 
         nn.init.normal_(self.alpha_matrix, 0.5, 0.5)
 
@@ -188,9 +186,7 @@ class GCN_layer(nn.Module):
         inputs = inputs.reshape((self._num_nodes, batch_size * self._input_dim))
 
         # LH
-        # 因为使用cpu训练，不需要把alpha_matrix 放入GPU中
-        # device = torch.device('cuda')
-        # self.alpha_matrix = self.alpha_matrix * torch.eye(num_nodes).to(device)
+        # Since using CPU for training, no need to put alpha_matrix into GPU
         new_alpha_matrix = self.alpha_matrix * torch.eye(self._num_nodes).to(self.device)
         new_laplacian = self.laplacian + new_alpha_matrix
         # LH
@@ -216,14 +212,14 @@ class GCN(nn.Module):
         self._input_dim = input_dim
         self._output_dim = output_dim
         self.device = device
-        # 两层GCN
+        # Two-layer GCN
         self.gcn1 = GCN_layer(self._input_dim, self._input_dim * 2, adj, device)
         self.gcn2 = GCN_layer(self._input_dim * 2, self._output_dim, adj, device)
 
     def forward(self, inputs, adj_laplacian):
         output_first = self.gcn1(inputs)
 
-        # 添加激活函数
+        # Add activation function
         output_second = self.gcn2(output_first)
 
         return output_second
@@ -246,8 +242,8 @@ class TTransformer(nn.Module):
         self.device = device
         # Temporal embedding One hot
         self.time_num = time_num
-        #         self.one_hot = One_hot_encoder(embed_size, time_num)          # temporal embedding选用one-hot方式 或者
-        #         self.temporal_embedding = nn.Embedding(time_num, embed_size)  # temporal embedding选用nn.Embedding
+        #         self.one_hot = One_hot_encoder(embed_size, time_num)          # temporal embedding using one-hot method or
+        #         self.temporal_embedding = nn.Embedding(time_num, embed_size)  # temporal embedding using nn.Embedding
 
         self.attention = TMultiHeadAttention(embed_size, heads)
         self.norm1 = nn.LayerNorm(embed_size)
@@ -263,15 +259,12 @@ class TTransformer(nn.Module):
     def forward(self, value, key, query, t):
         B, N, T, C = query.shape
 
-        #         D_T = self.one_hot(t, N, T)                          # temporal embedding选用one-hot方式 或者
-        #         D_T = self.temporal_embedding(torch.arange(0, T).to('cuda:0'))    # temporal embedding选用nn.Embedding
-        # D_T = get_sinusoid_encoding_table(T, C).to('cuda:0')
         # LH
         D_T = get_sinusoid_encoding_table(T, C).to(self.device)
         # LH
         D_T = D_T.expand(B, N, T, C)
 
-        # temporal embedding加到query。 原论文采用concatenated
+        # Add temporal embedding to query. Original paper uses concatenated
         query = query + D_T
 
         attention = self.attention(query, query, query)
@@ -295,8 +288,7 @@ class TMultiHeadAttention(nn.Module):
                 self.head_dim * heads == embed_size
         ), "Embedding size needs to be divisible by heads"
 
-        # 用Linear来做投影矩阵
-        # 但这里如果是多头的话，是不是需要声明多个矩阵？？？
+        # Use Linear as projection matrix
 
         self.W_V = nn.Linear(self.embed_size, self.head_dim * self.heads, bias=False)
         self.W_K = nn.Linear(self.embed_size, self.head_dim * self.heads, bias=False)
@@ -335,7 +327,7 @@ class ScaledDotProductAttention(nn.Module):
         Q: [batch_size, n_heads, T(Spatial) or N(Temporal), N(Spatial) or T(Temporal), d_k]
         K: [batch_size, n_heads, T(Spatial) or N(Temporal), N(Spatial) or T(Temporal), d_k]
         V: [batch_size, n_heads, T(Spatial) or N(Temporal), N(Spatial) or T(Temporal), d_k]
-        attn_mask: [batch_size, n_heads, seq_len, seq_len] 可能没有
+        attn_mask: [batch_size, n_heads, seq_len, seq_len] may not exist
         '''
         B, n_heads, len1, len2, d_k = Q.shape
         scores = torch.matmul(Q, K.transpose(-1, -2)) / np.sqrt(d_k)
@@ -346,5 +338,3 @@ class ScaledDotProductAttention(nn.Module):
         context = torch.matmul(attn,
                                V)  # [batch_size, n_heads, T(Spatial) or N(Temporal), N(Spatial) or T(Temporal), d_k]]
         return context
-
-

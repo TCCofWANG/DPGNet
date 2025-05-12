@@ -141,7 +141,7 @@ def barrier():
         dist.barrier()
 
 
-'''这一段是初始化分布式训练函数的代码'''
+
 def init_distributed_mode(args):
     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
         args.rank = int(os.environ['RANK'])
@@ -150,7 +150,7 @@ def init_distributed_mode(args):
     elif 'SLURM_PROCID' in os.environ:
         args.rank = int(os.environ['SLURM_PROCID'])
         args.local_rank = args.rank % torch.cuda.device_count()
-    else: # 进入的是这个部分的代码
+    else: 
         print('not using distributed mode')
         args.distributed = False
         return

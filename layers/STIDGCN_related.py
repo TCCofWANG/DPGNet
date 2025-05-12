@@ -20,7 +20,6 @@ class GLU(nn.Module):
         out = self.conv3(out)
         return out
 
-'''源码是对数据集整个序列打乱的，这里是按顺序的'''
 class TemporalEmbedding(nn.Module):
     def __init__(self, time, features, points_per_hour, num_nodes):
         super(TemporalEmbedding, self).__init__()
@@ -39,13 +38,13 @@ class TemporalEmbedding(nn.Module):
         nn.init.xavier_uniform_(self.time_week)
 
     def forward(self, seq_time):
-        hour = (seq_time[:, -2:-1, ...] + 0.5) * 23  # 得到第几个小时
-        min = (seq_time[:, -1:, ...] + 0.5) * 59  # 得到第几分钟
+        hour = (seq_time[:, -2:-1, ...] + 0.5) * 23  # Get the hour index
+        min = (seq_time[:, -1:, ...] + 0.5) * 59  # Get the minute index
         hour_index = ((hour * 60 + min) / (60 / self.points_per_hour)).squeeze().type(torch.LongTensor)  # 得到第几个时间步
 
         day = ((seq_time[:, 2:3, ...] + 0.5) * (6 - 0)).squeeze().type(torch.LongTensor)  # 一周的第几天
 
-        # 用广播机制构建emb
+        # Construct embedding using broadcasting
         time_day = self.time_day[hour_index.unsqueeze(-1).repeat(1, 1, self.num_nodes)]
         time_week = self.time_week[day.unsqueeze(-1).repeat(1, 1, self.num_nodes)]
 
@@ -55,7 +54,6 @@ class TemporalEmbedding(nn.Module):
 
         return tem_emb
 
-'论文是说，构建邻接矩阵时会进行时间维度上的消除，论文是说用先加和再用FC进行消除(有点奇怪)，源码是用einsum函数直接进行计算(相当于直接加和加和的方法),这里是和源码一样的'
 class Graph_Generator(nn.Module):
     def __init__(self, channels=128, num_nodes=170, diffusion_step=1, dropout=0.1):
         super().__init__()
@@ -73,7 +71,7 @@ class Graph_Generator(nn.Module):
         topk_values, topk_indices = torch.topk(adj_f, k=int(adj_f.shape[1] * 0.8), dim=-1)
         mask = torch.zeros_like(adj_f)
         mask.scatter_(-1, topk_indices, 1)
-        adj_f = adj_f * mask  # 确保稀疏性
+        adj_f = adj_f * mask  # Ensure sparsity
 
         return adj_f
 
@@ -117,7 +115,7 @@ class DGCN(nn.Module):
         x = x * self.emb + skip
         return x
 
-class Splitting(nn.Module):  # 按奇偶时间步进行分离
+class Splitting(nn.Module):  # Separate by even and odd time steps
     def __init__(self):
         super(Splitting, self).__init__()
 
@@ -188,7 +186,7 @@ class IDGCN(nn.Module):
 
         return [x_even_update, x_odd_update]
 
-'''IDGCN树'''
+'''IDGCN Tree'''
 class IDGCN_Tree(nn.Module):
     def __init__(
             self,seq_len,channels=64, diffusion_step=1, num_nodes=170, dropout=0.1
