@@ -41,6 +41,7 @@ def seed_worker(worker_id):
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
+
 '''The following is to set the random seed.'''
 def seed_everything(seed, benchmark=False):
     # os.environ['PYTHONHASHSEED'] = str(seed)
