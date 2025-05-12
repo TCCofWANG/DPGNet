@@ -27,7 +27,7 @@ class DPG_Mixer(nn.Module):
     def __init__(self, num_nodes, in_dim, out_dim,d_model,d_ff,pred_len,
                  dropout=0.3, supports=None,kernel_size=2, blocks=4, layers=1,args=None,**kwargs):
         super().__init__()
-        # 超参设置
+        # hyperparameters settings
         self.dropout = dropout
         self.blocks = blocks
         self.layers = layers
@@ -42,18 +42,18 @@ class DPG_Mixer(nn.Module):
 
         self.init_fc = Conv2d(in_dim, residual_channels, (1, 1), padding=(0, 0), stride=(1, 1), bias=True)
 
-        # TODO 动态图
+        # TODO dynamic_graph
         self.xlstm = XLSTM_dynamic_graph(in_feature=residual_channels,d_model=d_model,save_path=args.output_dir,num_nodes=num_nodes,pred_n=self.pred_n)
 
-        # TODO 输出头
+        # TODO predictor
         self.predictor = DPG_Mixer_Predictor(num_nodes,d_model,out_dim,d_model,d_ff,self.iter_pred_len,self.supports_len,dropout,kernel_size,blocks,layers,configs=args)
 
         # TODO embedding
         self.embedding_use = args.embedding_use
         self.num_layer = 2
         self.num_nodes = args.num_nodes
-        self.day_of_week_size = 7  # 选取一周的n天
-        self.time_of_day_size = args.points_per_hour * 24  # 一天有几个时间步记录
+        self.day_of_week_size = 7  
+        self.time_of_day_size = args.points_per_hour * 24  
         self.time_in_day_emb = nn.Parameter(torch.empty(self.time_of_day_size, self.args.d_model))
         nn.init.xavier_uniform_(self.time_in_day_emb)
         self.day_in_week_emb = nn.Parameter(torch.empty(self.day_of_week_size, self.args.d_model))
@@ -90,7 +90,7 @@ class DPG_Mixer(nn.Module):
         return nodevec1, nodevec2
 
     def visual_Attention(self, A, save_path):
-        # 这一版里面输入的A是[support_explicit,support_implicit]
+        
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         tmp = A[0][0, :].clone()
@@ -111,7 +111,7 @@ class DPG_Mixer(nn.Module):
         return
 
     def visual_Ori_Attention(self, A, save_path):
-        # 可视化原始的输入Adj
+        
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         tmp = A[:, :].clone()
@@ -124,8 +124,8 @@ class DPG_Mixer(nn.Module):
         return
 
     def Embedding(self, input_data, seq_time):
-        hour = (seq_time[:, -2:-1, ...] + 0.5) * 23  # 得到第几个小时
-        min = (seq_time[:, -1:, ...] + 0.5) * 59  # 得到第几分钟
+        hour = (seq_time[:, -2:-1, ...] + 0.5) * 23  
+        min = (seq_time[:, -1:, ...] + 0.5) * 59  
         hour_index = (hour * 60 + min) / (60 / self.args.points_per_hour)
         time_in_day_emb = self.time_in_day_emb[
             hour_index[..., -1].squeeze(1).repeat(1, self.args.num_nodes).type(torch.LongTensor)]  # (B,N,D)
@@ -168,7 +168,6 @@ class DPG_Mixer(nn.Module):
         iter_pred_list = []
         B,D,N,L = x.shape
 
-        # 每一次的动态图输入为上一次的输出，而不是原始的adj，目的是为了解决长期预测情况下精度不好的问题
         adj_dynamic = self.fixed_supports.unsqueeze(0).repeat(B, 1, 1)
 
         input_x = x
@@ -177,7 +176,7 @@ class DPG_Mixer(nn.Module):
         # TODO embedding
         if self.embedding_use:
             emb = self.Embedding(input_data=input_x.clone(), seq_time=time)
-            input_x_ = self.init_fc(input_x + emb)  # 特征维度升维
+            input_x_ = self.init_fc(input_x + emb)  
 
         else:
             input_x_ = self.init_fc(input_x)
@@ -238,7 +237,7 @@ class GraphConvNet(nn.Module):
         h = F.dropout(h, self.dropout, training=self.training)
         return h
 
-'''利用XLSTM的思想生成动态图'''
+'''Generating dynamic graphs using the idea of XLSTM'''
 class XLSTM_dynamic_graph(nn.Module):
     def __init__(self,in_feature,d_model,save_path,num_nodes,pred_n,**kwargs):
         super().__init__()
@@ -265,12 +264,10 @@ class XLSTM_dynamic_graph(nn.Module):
 
         self.input=nn.Linear(d_model,1)
         self.forget = nn.Linear(d_model, 1)
-        # 以下是两个状态空间
+        # The following are two state spaces.
 
-        #FIXME 测试softplus约束输入门的输入
         self.q_k_activation = nn.Softplus()
 
-        # weight pool 的后续层
         self.v_ln =nn.LayerNorm(d_model,elementwise_affine=True)
         self.v_d = nn.Dropout(0.1)
 
@@ -319,10 +316,11 @@ class XLSTM_dynamic_graph(nn.Module):
         if self.padding_patch == 'end':
             z = x.view(B,-1,L)# True
             z = self.padding_patch_layer(z)
-            z = z.view(B,C,N,-1)# 序列最后填充  序列最后一个值重复stride次，即边缘重复stride次
+            z = z.view(B,C,N,-1)
+            # Fill the end of the sequence by repeating the last value of the sequence for 'stride' times, that is, repeat the edge for 'stride' times.
 
         z = z.unfold(dimension=-1, size=self.patch_len, step=self.stride)
-        B,C,N,n,p = z.shape# z: [bs,dim,patch_num,patch_len]  类似卷积的切片操作
+        B,C,N,n,p = z.shape# z: [bs,dim,patch_num,patch_len] 
         z = z.view(B,C*p,N,n)
 
         z = self.init_fc(z)
@@ -345,7 +343,7 @@ class XLSTM_dynamic_graph(nn.Module):
         m_now=m_past
         B,N,C=xt.shape
 
-        # weight pool 映射
+        # weight pool
         # ----------------------------------------------
         key = torch.einsum('bnd,ndo->bno', xt, self.weight_pool_k) + self.bias_pool_k
         key = self.q_k_activation(self.k_d(self.k_ln(key)))
@@ -356,21 +354,18 @@ class XLSTM_dynamic_graph(nn.Module):
         # ----------------------------------------------
 
 
-        # -1测试过了 torch.sum(now[0,0,:])=1  F.softmax的dim和正常的切片索引不一样
         now = F.relu(self.now_ln(torch.matmul(key,value.transpose(-1,-2))))
-        normal_key=torch.max(torch.abs(value),dim=-1,keepdim=True)[0] # 将H维度融掉
+        normal_key=torch.max(torch.abs(value),dim=-1,keepdim=True)[0] 
         normalize_now=torch.multiply(F_gate,normalize_past)+torch.multiply(I_gate,normal_key)
-        tmp=torch.relu(normalize_now-1)+1 # 把小于1的都变为了1
+        tmp=torch.relu(normalize_now-1)+1 
 
-        # 沿着行的方向计算最小值和最大值
         min_vals, _ = torch.min(now, dim=-1, keepdim=True)
         max_vals, _ = torch.max(now, dim=-1, keepdim=True)
 
-        # 最小-最大缩放，将x的范围缩放到[0, 1]
         now_min_max = (now - min_vals) / (max_vals - min_vals)
         now_min_max = now_min_max/tmp
 
-        # 二值化，降低小噪声的影响，稀疏化 可以改进为topk
+        # Binarization, reducing the impact of small noise, and sparsification can be improved to topk.
         now_min_max = torch.where(now_min_max>=0.5,1,0)
         cell=torch.multiply(F_gate,cell_past)+torch.multiply(I_gate,now_min_max)#(B,N,N)
         h=cell
@@ -421,7 +416,6 @@ class SNorm(nn.Module):
         return out #(B,C,N,T)
 
 
-# TODO 得到的是高频分量
 class TNorm(nn.Module):
     def __init__(self,  num_nodes, channels, track_running_stats=True, momentum=0.1):
         super(TNorm, self).__init__()
@@ -434,12 +428,11 @@ class TNorm(nn.Module):
 
     def forward(self, x):
         # input:x(B,C,N,T)
-        if self.track_running_stats:#在batch_size维度和时间维度
+        if self.track_running_stats:
             mean = x.mean((0, 3), keepdims=True)
             var = x.var((0, 3), keepdims=True, unbiased=False)
             if self.training:
                 n = x.shape[3] * x.shape[0]
-                # 以下的是指数加权平均求期望E，因为这个是整一个完整(数据集)的时间步上的均值和方差,因此这里采用指数加权平均的方法来近似得到
                 with torch.no_grad():
                     self.running_mean = self.momentum * mean + (1 - self.momentum) * self.running_mean
                     self.running_var = self.momentum * var * n / (n - 1) + (1 - self.momentum) * self.running_var
